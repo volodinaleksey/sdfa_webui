@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDFA Files Distribution</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1><i class="fas fa-database"></i> SDFA Files Distribution</h1>
+        
+        <!-- Theme Toggle Button -->
+        <button id="theme-toggle" class="theme-toggle" onclick="toggleTheme()">
+            <i class="fas fa-moon"></i> Dark Theme
+        </button>
+        
+        <!-- Root Directory Distribution -->
+        <div class="section">
+            <h2><i class="fas fa-folder-open"></i> Distribution by Root Directories</h2>
+            
+            <!-- Search bar for root directories -->
+            <div class="search-container">
+                <input type="text" id="rootSearch" onkeyup="filterTable('rootSearch', 'rootTable')" placeholder="Search Root Directories...">
+                <i class="fas fa-search search-icon"></i>
+            </div>
+            
+            <table id="rootTable">
+                <thead>
+                    <tr>
+                        <th>Root Directory</th>
+                        <th>Size</th>
+                        <th>Percentage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in root_distribution %}
+                    <tr>
+                        <td>{{ item.root }}</td>
+                        <td>{{ human_readable_size(item.size) }}</td>
+                        <td>{{ "%.2f"|format(item.percentage) }}%</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="total">
+                        <td><strong>Total</strong></td>
+                        <td><strong>{{ human_readable_size(total_size) }}</strong></td>
+                        <td><strong></strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Hierarchical Distribution -->
+        <div class="section">
+            <h2><i class="fas fa-sitemap"></i> Hierarchical Distribution by Project/Ident/Version</h2>
+            
+            <!-- Search bar for hierarchical distribution -->
+            <div class="search-container">
+                <input type="text" id="hierarchySearch" onkeyup="filterTable('hierarchySearch', 'hierarchy-body')" placeholder="Search Hierarchical Distribution...">
+                <i class="fas fa-search search-icon"></i>
+            </div>
+            
+            <table class="hierarchical-table">
+                <thead>
+                    <tr>
+                        <th>Project / Ident / Version</th>
+                        <th>Total Size</th>
+                        {% for root in root_directories %}
+                        <th>{{ root }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody id="hierarchy-body">
+                    <!-- Iterating over the list of projects -->
+                    {% for project in projects %}
+                    <tr class="hierarchy-row project-row" data-level="project" data-name="{{ project.name }}">
+                        <td>
+                            <span class="toggle" onclick="toggleHierarchy(this, '{{ project.name }}')">▶</span>
+                            <strong>{{ project.name }}</strong>
+                        </td>
+                        <td>{{ human_readable_size(project.total_size) }}</td>
+                        {% for dist in project.distribution %}
+                        <td>
+                            <div class="distribution">
+                                <div class="distribution-item">
+                                    {{ human_readable_size(dist.size) }} ({{ "%.1f"|format(dist.percentage) }}%)
+                                </div>
+                                <div class="distribution-bar" style="width: {{ dist.percentage }}%"></div>
+                            </div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+
+                    <!-- Iterating over the list of identifiers -->
+                    {% for ident in project.idents %}
+                    <tr class="hierarchy-row ident-row hidden" data-level="ident" data-parent="{{ project.name }}" data-name="{{ ident.name }}">
+                        <td>
+                            <span class="toggle indent-1" onclick="toggleHierarchy(this, '{{ project.name }}_{{ ident.name }}')">▶</span>
+                            <span class="indent-1">{{ ident.name }}</span>
+                        </td>
+                        <td>{{ human_readable_size(ident.total_size) }}</td>
+                        {% for dist in ident.distribution %}
+                        <td>
+                            <div class="distribution">
+                                <div class="distribution-item">
+                                    {{ human_readable_size(dist.size) }} ({{ "%.1f"|format(dist.percentage) }}%)
+                                </div>
+                                <div class="distribution-bar" style="width: {{ dist.percentage }}%"></div>
+                            </div>
+                        </td>
+                        {% endfor %}
+                    </tr>
+
+                        <!-- Iterating over the list of versions -->
+                        {% for version in ident.versions %}
+                        <tr class="hierarchy-row version-row hidden" data-level="version" data-parent="{{ project.name }}_{{ ident.name }}" data-name="{{ version.name }}">
+                            <td><span class="indent-2">{{ version.name }}</span></td>
+                            <td>{{ human_readable_size(version.total_size) }}</td>
+                            {% for dist in version.distribution %}
+                            <td>
+                                <div class="distribution">
+                                    <div class="distribution-item">
+                                        {{ human_readable_size(dist.size) }} ({{ "%.1f"|format(dist.percentage) }}%)
+                                    </div>
+                                    <div class="distribution-bar" style="width: {{ dist.percentage }}%"></div>
+                                </div>
+                            </td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer with total size -->
+        <footer class="footer">
+            <p>Total Size: {{ human_readable_size(total_size) }}</p>
+        </footer>
+    </div>
+
+    <script>
+    function filterTable(inputId, tableId) {
+        const input = document.getElementById(inputId);
+        const filter = input.value.toLowerCase();
+        const table = document.getElementById(tableId);
+        const trs = table.getElementsByTagName("tr");
+
+        for (let i = 0; i < trs.length; i++) {
+            const tds = trs[i].getElementsByTagName("td");
+            let match = false;
+            for (let j = 0; j < tds.length; j++) {
+                if (tds[j]) {
+                    const txtValue = tds[j].textContent || tds[j].innerText;
+                    if (txtValue.toLowerCase().indexOf(filter) > -1) {
+                        match = true;
+                        break;
+                    }
+                }
+            }
+            trs[i].style.display = match ? "" : "none";
+        }
+    }
+
+    function toggleHierarchy(element, name) {
+        // Change the icon
+        element.textContent = element.textContent === '▶' ? '▼' : '▶';
+
+        // Find all child elements
+        const rows = document.querySelectorAll(`[data-parent="${name}"]`);
+        rows.forEach(row => {
+            row.classList.toggle('hidden');
+        });
+    }
+
+    // Theme switching functionality
+    function toggleTheme() {
+        const body = document.body;
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        // Toggle the 'dark-theme' class on body
+        body.classList.toggle('dark-theme');
+        
+        // Update button text and store preference
+        if (body.classList.contains('dark-theme')) {
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i> Light Theme';
+            localStorage.setItem('theme', 'dark');
+        } else {
+            themeToggle.innerHTML = '<i class="fas fa-moon"></i> Dark Theme';
+            localStorage.setItem('theme', 'light');
+        }
+    }
+
+    // Initialize theme on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const savedTheme = localStorage.getItem('theme');
+        const body = document.body;
+        const themeToggle = document.getElementById('theme-toggle');
+        
+        if (savedTheme === 'dark') {
+            body.classList.add('dark-theme');
+            themeToggle.innerHTML = '<i class="fas fa-sun"></i> Light Theme';
+        } else {
+            body.classList.remove('dark-theme');
+            themeToggle.innerHTML = '<i class="fas fa-moon"></i> Dark Theme';
+        }
+    });
+    </script>
+</body>
+</html>
