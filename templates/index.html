@@ -196,7 +196,7 @@
 
     // Initialize theme on page load
     document.addEventListener('DOMContentLoaded', function() {
-        const savedTheme = localStorage.getItem('theme');
+        const savedTheme = localStorage.getItem('theme') || 'dark'; // Default to dark if no theme is set
         const body = document.body;
         const themeToggle = document.getElementById('theme-toggle');
         
